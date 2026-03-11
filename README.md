@@ -1,13 +1,13 @@
-# @geraldine/nestjs
+# @fintastic/nest-rsl
 
-.NET-inspired Generic Repository + Service Layer base classes for NestJS.
+Generic Repository + Service Layer base classes for NestJS.
 
 Provides a strongly-typed CRUD framework with AutoMapper integration, paged search, audit fields, and response wrappers — so every NestJS module follows the same pattern.
 
 ## Installation
 
 ```bash
-pnpm add @geraldine/nestjs
+pnpm add @fintastic/nest-rsl
 ```
 
 You also need these peer dependencies (already installed in a standard NestJS project):
@@ -24,7 +24,7 @@ pnpm add reflect-metadata rxjs typeorm
 ### 1. Register FrameworkModule in your root AppModule
 
 ```ts
-import { FrameworkModule } from '@geraldine/nestjs'
+import { FrameworkModule } from '@fintastic/nest-rsl'
 
 @Module({
   imports: [FrameworkModule],
@@ -45,7 +45,7 @@ Each NestJS module follows this structure:
 ### Entity
 
 ```ts
-import { BaseEntity } from '@geraldine/nestjs'
+import { BaseEntity } from '@fintastic/nest-rsl'
 import { AutoMap } from '@automapper/classes'
 import { Column, Entity } from 'typeorm'
 
@@ -60,7 +60,7 @@ export class TodoEntity extends BaseEntity {
 ### DTO
 
 ```ts
-import { BaseDto } from '@geraldine/nestjs'
+import { BaseDto } from '@fintastic/nest-rsl'
 import { AutoMap } from '@automapper/classes'
 
 export class TodoDto extends BaseDto {
@@ -72,7 +72,7 @@ export class TodoDto extends BaseDto {
 ### Repository
 
 ```ts
-import { BaseRepository } from '@geraldine/nestjs'
+import { BaseRepository } from '@fintastic/nest-rsl'
 import { InjectRepository } from '@nestjs/typeorm'
 import { InjectMapper } from '@automapper/nestjs'
 import { Injectable } from '@nestjs/common'
@@ -93,7 +93,7 @@ export class TodoRepository extends BaseRepository<TodoEntity, TodoDto> {
 ### Service
 
 ```ts
-import { BaseService } from '@geraldine/nestjs'
+import { BaseService } from '@fintastic/nest-rsl'
 import { Injectable } from '@nestjs/common'
 
 @Injectable()
@@ -107,7 +107,7 @@ export class TodoService extends BaseService<TodoEntity, TodoDto> {
 ### Controller
 
 ```ts
-import { BaseController, GenericRequest, GenericResponse } from '@geraldine/nestjs'
+import { BaseController, GenericRequest, GenericResponse } from '@fintastic/nest-rsl'
 import { Controller, Post, Body, Get, Param } from '@nestjs/common'
 
 @Controller('todo')
@@ -137,7 +137,7 @@ export class TodoController extends BaseController {
 ### AutoMapper Profile
 
 ```ts
-import { BaseMapperProfile } from '@geraldine/nestjs'
+import { BaseMapperProfile } from '@fintastic/nest-rsl'
 import { Injectable } from '@nestjs/common'
 import { Mapper } from '@automapper/core'
 
@@ -156,7 +156,7 @@ export class TodoProfile extends BaseMapperProfile {
 Apply globally or per-controller to convert UTC dates to the user's timezone (passed via `X-Timezone` request header):
 
 ```ts
-import { DateTransformInterceptor } from '@geraldine/nestjs'
+import { DateTransformInterceptor } from '@fintastic/nest-rsl'
 import { UseInterceptors } from '@nestjs/common'
 
 @UseInterceptors(DateTransformInterceptor)
