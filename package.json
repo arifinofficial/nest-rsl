@@ -1,7 +1,7 @@
 {
-  "name": "@geraldine/nestjs",
+  "name": "@fintastic/nest-rsl",
   "version": "0.1.0",
-  "description": ".NET-inspired Generic Repository + Service Layer base classes for NestJS",
+  "description": "Generic Repository + Service Layer base classes for NestJS",
   "author": "",
   "license": "MIT",
   "main": "./dist/index.js",
