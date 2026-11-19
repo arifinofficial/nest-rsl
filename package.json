@@ -1,6 +1,6 @@
 {
   "name": "@fintastic/nest-rsl",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Generic Repository + Service Layer base classes for NestJS",
   "author": "",
   "license": "MIT",
@@ -15,7 +15,8 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "CHANGELOG.md"
   ],
   "scripts": {
     "build": "tsup",
