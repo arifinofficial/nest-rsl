@@ -20,7 +20,8 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
-    "test": "vitest run",
+    "test": "vitest run && pnpm test:compat",
+    "test:compat": "pnpm build && pnpm pack --out compat/nest-rsl.tgz && pnpm --dir compat install --ignore-workspace --no-frozen-lockfile && node compat/run.cjs",
     "prepublishOnly": "pnpm build"
   },
   "peerDependencies": {
