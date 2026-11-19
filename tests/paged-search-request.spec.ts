@@ -27,6 +27,14 @@ describe('PagedSearchRequest validation', () => {
     expect(Object.values(errors[0].constraints ?? {})).toContain(FILTERS_NOT_ACCEPTED)
   })
 
+  it('still rejects filters and filtersVariable when validation groups are set', async () => {
+    const errors = await validate(build({ filters: '1=1', filtersVariable: { a: 1 } }), {
+      groups: ['other'],
+    })
+
+    expect(errors.map((e) => e.property).sort()).toEqual(['filters', 'filtersVariable'])
+  })
+
   it('passes when neither is present', async () => {
     expect(await validate(build())).toHaveLength(0)
   })

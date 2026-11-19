@@ -30,10 +30,10 @@ export class PagedSearchRequest {
    * error; the validator rejects any value so a ValidationPipe answers 400 instead of
    * silently stripping it (see CHANGELOG 0.2.0).
    */
-  @IsEmpty({ message: FrameworkConstants.Messages.FiltersNotAccepted })
+  @IsEmpty({ message: FrameworkConstants.Messages.FiltersNotAccepted, always: true })
   filters?: never
 
   /** See `filters`. */
-  @IsEmpty({ message: FrameworkConstants.Messages.FiltersNotAccepted })
+  @IsEmpty({ message: FrameworkConstants.Messages.FiltersNotAccepted, always: true })
   filtersVariable?: never
 }

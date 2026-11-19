@@ -1,3 +1,6 @@
+import { isEmpty } from 'class-validator'
+import { FrameworkConstants } from '../constants/framework.constants'
+
 export class PagedSearchParameter {
   pageIndex!: number
   pageSize!: number
@@ -13,7 +16,12 @@ export class PagedSearchParameter {
     orderByFieldName?: string
     sortOrder?: string
     keyword?: string
+    filters?: unknown
+    filtersVariable?: unknown
   }): PagedSearchParameter {
+    if (!isEmpty(request.filters) || !isEmpty(request.filtersVariable)) {
+      throw new Error(FrameworkConstants.Messages.FiltersNotAccepted)
+    }
     const parameter = new PagedSearchParameter()
     parameter.pageIndex = request.pageIndex
     parameter.pageSize = request.pageSize
