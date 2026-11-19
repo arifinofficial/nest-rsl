@@ -8,6 +8,7 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "skipLibCheck": true,
+    "types": ["vitest/globals", "node"],
     "outDir": "dist"
   },
   "include": ["src", "tests"]
