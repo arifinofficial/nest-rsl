@@ -56,6 +56,18 @@ export abstract class BaseService<
     return response
   }
 
+  async hardDelete(request: GenericRequest<IdType>): Promise<GenericResponse<Dto>> {
+    const response = new GenericResponse<Dto>()
+    const dto = await this.repository.hardDelete(request.data)
+    if (!dto) {
+      response.addErrorMessage('Item not found for deletion')
+      return response
+    }
+    response.data = dto
+    response.addInfoMessage('Data deleted successfully')
+    return response
+  }
+
   async pagedSearch(request: PagedSearchRequest): Promise<GenericPagedSearchResponse<Dto>> {
     return await this.pagedSearchInternal(this.repository, request)
   }

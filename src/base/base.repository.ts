@@ -25,7 +25,7 @@ export abstract class BaseRepository<
 
   async read(primaryKey: IdType): Promise<Dto | null> {
     const entity = await this.repository.findOne({
-      where: { id: primaryKey } as FindOptionsWhere<Entity>,
+      where: this.liveWhere(primaryKey),
     })
     if (!entity) return null
     return this.entityToDto(entity)
@@ -33,20 +33,30 @@ export abstract class BaseRepository<
 
   async update(dto: Dto): Promise<Dto | null> {
     const entity = await this.repository.findOne({
-      where: { id: dto.id } as FindOptionsWhere<Entity>,
+      where: this.liveWhere(dto.id),
     })
     if (!entity) return null
     const updatedEntity = this.dtoToEntity(dto)
     await this.repository.update(dto.id as any, updatedEntity as any)
     const savedEntity = await this.repository.findOne({
-      where: { id: dto.id } as FindOptionsWhere<Entity>,
+      where: this.liveWhere(dto.id),
     })
     if (!savedEntity) return null
     return this.entityToDto(savedEntity)
   }
 
   async delete(primaryKey: IdType): Promise<Dto | null> {
-    return this.hardDelete(primaryKey)
+    if (!this.softDeleteColumn) return this.hardDelete(primaryKey)
+    const entity = await this.repository.findOne({
+      where: this.liveWhere(primaryKey),
+    })
+    if (!entity) return null
+    const dto = this.entityToDto(entity)
+    await this.repository.update(
+      { id: primaryKey } as FindOptionsWhere<Entity>,
+      { [this.softDeleteColumn]: true } as any,
+    )
+    return dto
   }
 
   async hardDelete(primaryKey: IdType): Promise<Dto | null> {
@@ -72,6 +82,12 @@ export abstract class BaseRepository<
       queryBuilder.andWhere(parameter.filters, parameter.filtersVariable)
     }
 
+    if (this.softDeleteColumn) {
+      queryBuilder.andWhere(`entity.${this.softDeleteColumn} = :softDeleteLive`, {
+        softDeleteLive: false,
+      })
+    }
+
     const orderByField = parameter.orderByFieldName || 'id'
     const sortOrder =
       parameter.sortOrder === FrameworkConstants.SortOrder.Descending ? 'DESC' : 'ASC'
@@ -93,6 +109,11 @@ export abstract class BaseRepository<
     const entities = dtos.map((dto) => this.dtoToEntity(dto))
     const savedEntities = await this.repository.save(entities as any)
     return savedEntities.map((entity: Entity) => this.entityToDto(entity))
+  }
+
+  private liveWhere(primaryKey: IdType): FindOptionsWhere<Entity> {
+    const live = this.softDeleteColumn ? { [this.softDeleteColumn]: false } : {}
+    return { id: primaryKey, ...live } as FindOptionsWhere<Entity>
   }
 
   protected dtoToEntity(dto: Dto): Entity {
