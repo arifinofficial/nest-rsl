@@ -1,4 +1,7 @@
-import { DataSource } from 'typeorm'
+import { Column, DataSource, Entity, PrimaryColumn } from 'typeorm'
+import { AutoMap, classes } from '@automapper/classes'
+import { createMap, createMapper } from '@automapper/core'
+import { BaseRepository } from '../src/base/base.repository'
 import {
   createHarness,
   SoftTodoRepository,
@@ -13,7 +16,52 @@ class OrKeywordSoftRepository extends SoftTodoRepository {
   }
 }
 
+class Address {
+  @Column({ type: 'varchar', nullable: true })
+  city!: string
+}
+
+@Entity('place')
+class PlaceEntity {
+  @AutoMap()
+  @PrimaryColumn({ type: 'varchar' })
+  id!: string
+
+  @Column(() => Address)
+  address!: Address
+}
+
+class PlaceDto {
+  @AutoMap()
+  id!: string
+}
+
 describe('BaseRepository', () => {
+  describe('isSortableField with embedded columns', () => {
+    it('rejects an embedded leaf name such as "city"', async () => {
+      const dataSource = new DataSource({
+        type: 'sqljs',
+        entities: [PlaceEntity],
+        synchronize: true,
+      })
+      await dataSource.initialize()
+      const mapper = createMapper({ strategyInitializer: classes() })
+      createMap(mapper, PlaceEntity, PlaceDto)
+      createMap(mapper, PlaceDto, PlaceEntity)
+      class PlaceRepository extends BaseRepository<PlaceEntity, PlaceDto, string> {}
+      const repo = new PlaceRepository(
+        dataSource.getRepository(PlaceEntity),
+        mapper,
+        PlaceEntity,
+        PlaceDto,
+      )
+
+      expect(repo.isSortableField('id')).toBe(true)
+      expect(repo.isSortableField('city')).toBe(false)
+      await dataSource.destroy()
+    })
+  })
+
   describe('without softDeleteColumn', () => {
     let dataSource: DataSource
     let todoRepo: TodoRepository
@@ -32,6 +80,19 @@ describe('BaseRepository', () => {
       const dto = await todoRepo.read('a1')
 
       expect(dto).toMatchObject({ id: 'a1', title: 'x' })
+    })
+
+    it('update changes a live row, reloads it and returns the updated DTO', async () => {
+      await todoRepo.insert({ id: 'a1', title: 'x' } as TodoDto)
+
+      const dto = await todoRepo.update({ id: 'a1', title: 'changed' } as TodoDto)
+
+      expect(dto).toMatchObject({ id: 'a1', title: 'changed' })
+      expect(await todoRepo.read('a1')).toMatchObject({ title: 'changed' })
+    })
+
+    it('update returns null for an unknown id', async () => {
+      expect(await todoRepo.update({ id: 'missing', title: 'x' } as TodoDto)).toBeNull()
     })
 
     it('delete removes the row and returns the DTO as it was', async () => {
@@ -83,6 +144,90 @@ describe('BaseRepository', () => {
       const dto = await softRepo.read('a1')
 
       expect(dto).toMatchObject({ id: 'a1', title: 'x', is_deleted: false })
+    })
+
+    it('insert and bulkInsert leave rows live', async () => {
+      const one = await softRepo.insert({ id: 'a1', title: 'x' } as TodoDto)
+      const many = await softRepo.bulkInsert([
+        { id: 'a2', title: 'y' },
+        { id: 'a3', title: 'z' },
+      ] as TodoDto[])
+
+      expect(one.is_deleted).toBe(false)
+      expect(many.map((d) => d.is_deleted)).toEqual([false, false])
+      for (const id of ['a1', 'a2', 'a3']) {
+        expect(await softRepo.read(id)).toMatchObject({ id, is_deleted: false })
+      }
+    })
+
+    it('update changes a live row, reloads it and returns the updated DTO', async () => {
+      await seed('a1', 'x', false)
+
+      const dto = await softRepo.update({ id: 'a1', title: 'changed', is_deleted: false } as TodoDto)
+
+      expect(dto).toMatchObject({ id: 'a1', title: 'changed', is_deleted: false })
+      expect(await dataSource.getRepository(TodoEntity).findOneBy({ id: 'a1' })).toMatchObject({
+        title: 'changed',
+        is_deleted: false,
+      })
+    })
+
+    it('update never soft-deletes: a DTO with is_deleted=true leaves the row live and returns the DTO', async () => {
+      await seed('a1', 'x', false)
+
+      const dto = await softRepo.update({ id: 'a1', title: 'changed', is_deleted: true } as TodoDto)
+
+      expect(dto).toMatchObject({ id: 'a1', title: 'changed', is_deleted: false })
+      expect(await dataSource.getRepository(TodoEntity).findOneBy({ id: 'a1' })).toMatchObject({
+        title: 'changed',
+        is_deleted: false,
+      })
+    })
+
+    it('update cannot resurrect a row that was soft-deleted before the write', async () => {
+      await seed('a1', 'x', false)
+      const typeormRepo = dataSource.getRepository(TodoEntity)
+      // Simulate a concurrent soft-delete between the existence check and the write.
+      const realFindOne = typeormRepo.findOne.bind(typeormRepo)
+      let calls = 0
+      vi.spyOn(typeormRepo, 'findOne').mockImplementation(async (options: any) => {
+        const found = await realFindOne(options)
+        if (++calls === 1) await typeormRepo.update({ id: 'a1' }, { is_deleted: true })
+        return found
+      })
+      const repo = new SoftTodoRepository(typeormRepo, (softRepo as any).mapper, TodoEntity, TodoDto)
+
+      const dto = await repo.update({ id: 'a1', title: 'changed', is_deleted: false } as TodoDto)
+
+      expect(dto).toBeNull()
+      vi.restoreAllMocks()
+      expect(await typeormRepo.findOneBy({ id: 'a1' })).toMatchObject({
+        title: 'x',
+        is_deleted: true,
+      })
+    })
+
+    it('hardDelete removes a live row too', async () => {
+      await seed('a1', 'x', false)
+
+      const dto = await softRepo.hardDelete('a1')
+
+      expect(dto).toMatchObject({ id: 'a1', title: 'x', is_deleted: false })
+      expect(await dataSource.getRepository(TodoEntity).count()).toBe(0)
+    })
+
+    it('delete does not touch a row soft-deleted before the write', async () => {
+      await seed('a1', 'x', false)
+      const typeormRepo = dataSource.getRepository(TodoEntity)
+      const realFindOne = typeormRepo.findOne.bind(typeormRepo)
+      const updateSpy = vi.spyOn(typeormRepo, 'update')
+      vi.spyOn(typeormRepo, 'findOne').mockImplementation(async (options: any) => realFindOne(options))
+      const repo = new SoftTodoRepository(typeormRepo, (softRepo as any).mapper, TodoEntity, TodoDto)
+
+      await repo.delete('a1')
+
+      expect(updateSpy).toHaveBeenCalledWith({ id: 'a1', is_deleted: false }, { is_deleted: true })
+      vi.restoreAllMocks()
     })
 
     it('read ignores soft-deleted rows', async () => {
@@ -188,7 +333,7 @@ describe('BaseRepository', () => {
       expect(result.map((r) => r.id)).toEqual(['match-1', 'x4'])
     })
 
-    it('pagedSearch applies server-side filters together with keyword and soft-delete', async () => {
+    it('pagedSearch applies server-side filters together with soft-delete', async () => {
       await seed('a1', 'alpha', false)
       await seed('a2', 'alpha', true)
       await seed('a3', 'alpha beta', false)
@@ -203,6 +348,23 @@ describe('BaseRepository', () => {
 
       expect(count).toBe(2)
       expect(result.map((r) => r.id)).toEqual(['a1', 'a4'])
+    })
+
+    it('pagedSearch with an OR server filter never returns soft-deleted rows', async () => {
+      await seed('a1', 'alpha', false)
+      await seed('a2', 'beta', true)
+      await seed('a3', 'beta', false)
+      await seed('a4', 'gamma', false)
+
+      const { count, result } = await softRepo.pagedSearch({
+        pageIndex: 0,
+        pageSize: 10,
+        filters: 'entity.title = :a OR entity.title = :b',
+        filtersVariable: { a: 'alpha', b: 'beta' },
+      } as any)
+
+      expect(count).toBe(2)
+      expect(result.map((r) => r.id)).toEqual(['a1', 'a3'])
     })
 
     it('pagedSearch throws Invalid orderByFieldName for an unknown field', async () => {

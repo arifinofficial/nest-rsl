@@ -37,7 +37,14 @@ export abstract class BaseRepository<
     })
     if (!entity) return null
     const updatedEntity = this.dtoToEntity(dto)
-    await this.repository.update(dto.id as any, updatedEntity as any)
+    if (this.softDeleteColumn) {
+      // update never changes the soft-delete column (use delete / hardDelete), and the live
+      // criteria keeps a row soft-deleted since the check above from being written to.
+      delete updatedEntity[this.softDeleteColumn]
+      await this.repository.update(this.liveWhere(dto.id), updatedEntity as any)
+    } else {
+      await this.repository.update(dto.id as any, updatedEntity as any)
+    }
     const savedEntity = await this.repository.findOne({
       where: this.liveWhere(dto.id),
     })
@@ -53,7 +60,7 @@ export abstract class BaseRepository<
     if (!entity) return null
     const dto = this.entityToDto(entity)
     await this.repository.update(
-      { id: primaryKey } as FindOptionsWhere<Entity>,
+      this.liveWhere(primaryKey),
       { [this.softDeleteColumn]: true } as any,
     )
     return dto
@@ -119,7 +126,8 @@ export abstract class BaseRepository<
   }
 
   isSortableField(name: string): boolean {
-    return !!this.repository.metadata.findColumnWithPropertyName(name)
+    const column = this.repository.metadata.findColumnWithPropertyName(name)
+    return !!column && !column.embeddedMetadata
   }
 
   async bulkInsert(dtos: Dto[]): Promise<Dto[]> {
