@@ -68,3 +68,16 @@ Entry: `src/index.ts` → outputs `dist/index.js` (CJS), `dist/index.mjs` (ESM),
 Tests live in `tests/` (not colocated; `tests/support/todo.fixture.ts` has a real in-memory `sql.js` TypeORM `DataSource` harness, so generated SQL is exercised). Vitest (`vitest.config.mts`) runs with globals (`describe`, `it`, `expect`, `vi`); `tsconfig.json` has `experimentalDecorators` and `emitDecoratorMetadata` enabled (required for NestJS decorators). NestJS 12 and `@automapper/nestjs` 9 are ESM only, so the dev stack cannot use Jest. `peerDependencyRules` for the automapper peer mismatch live in `pnpm-workspace.yaml`.
 
 `pnpm test` runs Vitest and then `pnpm test:compat`. `test:compat` builds, packs `compat/nest-rsl.tgz`, installs the old stack fixture in `compat/` (CommonJS, NestJS 11, `@automapper` 8, TypeORM 0.3) and runs `compat/run.cjs` against the packed tarball, so both supported stacks are checked. `package.json` `files` ships `dist` and `CHANGELOG.md`.
+
+## CI and Releasing
+
+`.github/workflows/ci.yml` runs `pnpm install --frozen-lockfile`, `pnpm test` and `pnpm build` on every pull request and push to `main`. pnpm comes from `packageManager` in `package.json` (pnpm 12 also pins it in `pnpm-lock.yaml`).
+
+Releases are staged on npm from version tags by `.github/workflows/publish.yml`, using npm trusted publishing (OIDC). No npm token exists anywhere: do not add `NODE_AUTH_TOKEN`, `registry-url` or secrets. The trusted publisher on npmjs.com allows staging only, so every release needs a maintainer's 2FA approval.
+
+1. In a PR, bump `version` in `package.json` and add a dated `## X.Y.Z - YYYY-MM-DD` entry to `CHANGELOG.md`. Merge it.
+2. `git switch main && git pull && git tag vX.Y.Z && git push origin vX.Y.Z`
+3. `publish.yml` runs `scripts/check-release.sh` (tag must be a stable `vX.Y.Z`, equal to `v` + `package.json` version, on `origin/main`), then tests, builds and runs `npm stage publish --provenance --access public`.
+4. Approve the staged version with 2FA on npmjs.com, or `npm stage approve <id>`.
+
+Pre-release tags are rejected on purpose: staging one would move the `latest` dist-tag.
