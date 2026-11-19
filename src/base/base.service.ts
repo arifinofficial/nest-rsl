@@ -1,4 +1,3 @@
-import { BaseDto } from './base.dto'
 import { BaseRepository } from './base.repository'
 import { GenericRequest, PagedSearchRequest } from '../dto/request'
 import { GenericResponse, GenericPagedSearchResponse } from '../dto/response'
@@ -6,7 +5,7 @@ import { PagedSearchParameter } from '../models/paged-search-parameter.model'
 
 export abstract class BaseService<
   Entity extends { id: IdType },
-  Dto extends BaseDto<IdType>,
+  Dto extends { id: IdType },
   IdType = number,
   Repository extends BaseRepository<Entity, Dto, IdType> = BaseRepository<Entity, Dto, IdType>,
 > {

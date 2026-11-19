@@ -1,14 +1,15 @@
 import { Repository, FindOptionsWhere } from 'typeorm'
 import { Mapper } from '@automapper/core'
-import { BaseDto } from './base.dto'
 import { PagedSearchParameter, PagedSearchResult } from '../models'
 import { FrameworkConstants } from '../constants/framework.constants'
 
 export abstract class BaseRepository<
   Entity extends { id: IdType },
-  Dto extends BaseDto<IdType>,
+  Dto extends { id: IdType },
   IdType = number,
 > {
+  protected readonly softDeleteColumn?: keyof Entity & string
+
   constructor(
     protected readonly repository: Repository<Entity>,
     protected readonly mapper: Mapper,
@@ -45,6 +46,10 @@ export abstract class BaseRepository<
   }
 
   async delete(primaryKey: IdType): Promise<Dto | null> {
+    return this.hardDelete(primaryKey)
+  }
+
+  async hardDelete(primaryKey: IdType): Promise<Dto | null> {
     const entity = await this.repository.findOne({
       where: { id: primaryKey } as FindOptionsWhere<Entity>,
     })
