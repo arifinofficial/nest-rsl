@@ -1,4 +1,4 @@
-import { Repository, FindOptionsWhere } from 'typeorm'
+import { Brackets, Repository, FindOptionsWhere } from 'typeorm'
 import { Mapper } from '@automapper/core'
 import { PagedSearchParameter, PagedSearchResult } from '../models'
 import { FrameworkConstants } from '../constants/framework.constants'
@@ -70,25 +70,38 @@ export abstract class BaseRepository<
   }
 
   async pagedSearch(parameter: PagedSearchParameter): Promise<PagedSearchResult<Dto>> {
+    const orderByField = parameter.orderByFieldName || 'id'
+    if (!this.isSortableField(orderByField)) {
+      throw new Error('Invalid orderByFieldName: ' + orderByField)
+    }
+
     const queryBuilder = this.repository.createQueryBuilder('entity')
 
+    // Each condition gets its own brackets so an OR inside one cannot escape the others:
+    // (keyword) AND (filters) AND (soft-delete).
     if (parameter.keyword) {
-      queryBuilder.where(this.getKeywordSearchCondition(parameter.keyword), {
-        keyword: `%${parameter.keyword}%`,
-      })
+      const keywordCondition = this.getKeywordSearchCondition(parameter.keyword)
+      queryBuilder.andWhere(
+        new Brackets((qb) => {
+          qb.where(keywordCondition, { keyword: `%${parameter.keyword}%` })
+        }),
+      )
     }
 
     if (parameter.filters) {
-      queryBuilder.andWhere(parameter.filters, parameter.filtersVariable)
+      queryBuilder.andWhere(
+        new Brackets((qb) => {
+          qb.where(parameter.filters, parameter.filtersVariable)
+        }),
+      )
     }
 
     if (this.softDeleteColumn) {
-      queryBuilder.andWhere(`entity.${this.softDeleteColumn} = :softDeleteLive`, {
-        softDeleteLive: false,
+      queryBuilder.andWhere(`entity.${this.softDeleteColumn} = :__rslSoftDeleteLive`, {
+        __rslSoftDeleteLive: false,
       })
     }
 
-    const orderByField = parameter.orderByFieldName || 'id'
     const sortOrder =
       parameter.sortOrder === FrameworkConstants.SortOrder.Descending ? 'DESC' : 'ASC'
     queryBuilder.orderBy(`entity.${orderByField}`, sortOrder)
@@ -103,6 +116,10 @@ export abstract class BaseRepository<
     const result = entities.map((entity: Entity) => this.entityToDto(entity))
 
     return { count, result }
+  }
+
+  isSortableField(name: string): boolean {
+    return !!this.repository.metadata.findColumnWithPropertyName(name)
   }
 
   async bulkInsert(dtos: Dto[]): Promise<Dto[]> {

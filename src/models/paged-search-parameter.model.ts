@@ -13,8 +13,6 @@ export class PagedSearchParameter {
     orderByFieldName?: string
     sortOrder?: string
     keyword?: string
-    filters?: any
-    filtersVariable?: any
   }): PagedSearchParameter {
     const parameter = new PagedSearchParameter()
     parameter.pageIndex = request.pageIndex
@@ -22,8 +20,6 @@ export class PagedSearchParameter {
     parameter.orderByFieldName = request.orderByFieldName
     parameter.sortOrder = request.sortOrder
     parameter.keyword = request.keyword
-    parameter.filters = request.filters
-    parameter.filtersVariable = request.filtersVariable
     return parameter
   }
 }

@@ -7,6 +7,12 @@ import {
   TodoRepository,
 } from './support/todo.fixture'
 
+class OrKeywordSoftRepository extends SoftTodoRepository {
+  protected getKeywordSearchCondition(_keyword: string): string {
+    return 'entity.title LIKE :keyword OR entity.id LIKE :keyword'
+  }
+}
+
 describe('BaseRepository', () => {
   describe('without softDeleteColumn', () => {
     let dataSource: DataSource
@@ -157,6 +163,78 @@ describe('BaseRepository', () => {
         expect(count).toBe(2)
         expect(result.map((r) => r.id)).toEqual(['a1', 'a3'])
       }
+    })
+
+    it('pagedSearch with an OR keyword condition never returns soft-deleted rows', async () => {
+      const typeormRepo = dataSource.getRepository(TodoEntity)
+      const repo = new OrKeywordSoftRepository(
+        typeormRepo,
+        (softRepo as any).mapper,
+        TodoEntity,
+        TodoDto,
+      )
+      await seed('match-1', 'live one', false)
+      await seed('x2', 'match dead', true)
+      await seed('match-3', 'other dead', true)
+      await seed('x4', 'match live', false)
+
+      const { count, result } = await repo.pagedSearch({
+        pageIndex: 0,
+        pageSize: 10,
+        keyword: 'match',
+      } as any)
+
+      expect(count).toBe(2)
+      expect(result.map((r) => r.id)).toEqual(['match-1', 'x4'])
+    })
+
+    it('pagedSearch applies server-side filters together with keyword and soft-delete', async () => {
+      await seed('a1', 'alpha', false)
+      await seed('a2', 'alpha', true)
+      await seed('a3', 'alpha beta', false)
+      await seed('a4', 'beta', false)
+
+      const { count, result } = await softRepo.pagedSearch({
+        pageIndex: 0,
+        pageSize: 10,
+        filters: 'entity.id <> :excluded',
+        filtersVariable: { excluded: 'a3' },
+      } as any)
+
+      expect(count).toBe(2)
+      expect(result.map((r) => r.id)).toEqual(['a1', 'a4'])
+    })
+
+    it('pagedSearch throws Invalid orderByFieldName for an unknown field', async () => {
+      await expect(
+        softRepo.pagedSearch({
+          pageIndex: 0,
+          pageSize: 10,
+          orderByFieldName: 'title; DROP TABLE todo',
+        } as any),
+      ).rejects.toThrow('Invalid orderByFieldName: title; DROP TABLE todo')
+    })
+
+    it('pagedSearch orders by a valid column in the requested direction', async () => {
+      await seed('a1', 'b', false)
+      await seed('a2', 'c', false)
+      await seed('a3', 'a', false)
+
+      const { result } = await softRepo.pagedSearch({
+        pageIndex: 0,
+        pageSize: 10,
+        orderByFieldName: 'title',
+        sortOrder: 'DESC',
+      } as any)
+
+      expect(result.map((r) => r.title)).toEqual(['c', 'b', 'a'])
+    })
+
+    it('isSortableField: true for "title", false for "ID", "title; DROP TABLE todo_entity", "unknown"', () => {
+      expect(softRepo.isSortableField('title')).toBe(true)
+      expect(softRepo.isSortableField('ID')).toBe(false)
+      expect(softRepo.isSortableField('title; DROP TABLE todo_entity')).toBe(false)
+      expect(softRepo.isSortableField('unknown')).toBe(false)
     })
   })
 })

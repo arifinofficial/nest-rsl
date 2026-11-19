@@ -1,6 +1,8 @@
+import { isEmpty } from 'class-validator'
 import { BaseRepository } from './base.repository'
 import { GenericRequest, PagedSearchRequest } from '../dto/request'
 import { GenericResponse, GenericPagedSearchResponse } from '../dto/response'
+import { FrameworkConstants } from '../constants/framework.constants'
 import { PagedSearchParameter } from '../models/paged-search-parameter.model'
 
 export abstract class BaseService<
@@ -97,7 +99,17 @@ export abstract class BaseService<
     request: PagedSearchRequest,
   ): Promise<GenericPagedSearchResponse<Dto>> {
     const response = new GenericPagedSearchResponse<Dto>()
+    // A 0.1.0 client may still send filters; fail loudly instead of widening the result.
+    if (!isEmpty(request.filters) || !isEmpty(request.filtersVariable)) {
+      response.addErrorMessage(FrameworkConstants.Messages.FiltersNotAccepted)
+      return response
+    }
     const pagedSearchParameter = this.getPagedSearchParameter(request)
+    const orderByFieldName = pagedSearchParameter.orderByFieldName
+    if (orderByFieldName && !repository.isSortableField(orderByFieldName)) {
+      response.addErrorMessage('Invalid orderByFieldName: ' + orderByFieldName)
+      return response
+    }
     const result = await repository.pagedSearch(pagedSearchParameter)
     response.dtoCollection = result.result
     response.totalCount = result.count

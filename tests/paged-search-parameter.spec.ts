@@ -2,7 +2,7 @@ import { PagedSearchParameter } from '../src/models'
 
 describe('PagedSearchParameter', () => {
   describe('fromRequest', () => {
-    it('maps all fields from a request object', () => {
+    it('maps request fields but never copies filters or filtersVariable', () => {
       const request = {
         pageIndex: 2,
         pageSize: 10,
@@ -20,8 +20,8 @@ describe('PagedSearchParameter', () => {
       expect(param.orderByFieldName).toBe('name')
       expect(param.sortOrder).toBe('DESC')
       expect(param.keyword).toBe('test')
-      expect(param.filters).toBe('entity.active = :active')
-      expect(param.filtersVariable).toEqual({ active: true })
+      expect(param.filters).toBeUndefined()
+      expect(param.filtersVariable).toBeUndefined()
     })
 
     it('maps optional fields as undefined when absent', () => {

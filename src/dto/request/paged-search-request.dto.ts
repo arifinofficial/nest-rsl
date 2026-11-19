@@ -1,5 +1,6 @@
-import { IsOptional, IsInt, Min, IsString } from 'class-validator'
+import { IsEmpty, IsOptional, IsInt, Min, IsString } from 'class-validator'
 import { Type } from 'class-transformer'
+import { FrameworkConstants } from '../../constants/framework.constants'
 
 export class PagedSearchRequest {
   @IsInt()
@@ -24,10 +25,15 @@ export class PagedSearchRequest {
   @IsString()
   keyword?: string
 
-  @IsOptional()
-  @IsString()
-  filters?: string
+  /**
+   * No longer accepted from the client. Typed `never` so TypeScript callers get a compile
+   * error; the validator rejects any value so a ValidationPipe answers 400 instead of
+   * silently stripping it (see CHANGELOG 0.2.0).
+   */
+  @IsEmpty({ message: FrameworkConstants.Messages.FiltersNotAccepted })
+  filters?: never
 
-  @IsOptional()
-  filtersVariable?: any
+  /** See `filters`. */
+  @IsEmpty({ message: FrameworkConstants.Messages.FiltersNotAccepted })
+  filtersVariable?: never
 }
