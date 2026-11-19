@@ -18,7 +18,7 @@ function checkRelease(cwd: string, tag: string) {
 
 function setVersion(repo: string, version: string) {
   writeFileSync(join(repo, 'package.json'), JSON.stringify({ name: 'x', version }))
-  git(repo, 'commit', '-q', '-am', `version ${version}`)
+  git(repo, 'commit', '-q', '--allow-empty', '-am', `version ${version}`)
   git(repo, 'push', '-q', 'origin', 'main')
 }
 
