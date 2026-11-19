@@ -11,8 +11,10 @@
 
 ### Breaking
 
-- `filters` and `filtersVariable` are rejected when they come from a request.
-  `PagedSearchParameter.fromRequest` no longer copies them.
+- Non-empty `filters` or `filtersVariable` are rejected when they come from a request (an empty string or
+  `null` is ignored as before).
+  `PagedSearchParameter.fromRequest` no longer copies them and throws the message below if you pass it a
+  non-empty value.
   - With a `ValidationPipe` (whitelisting or not), the pipe answers 400.
   - Without a pipe, `BaseService.pagedSearch` returns an error response and runs no query.
   - Both use this message (also `FrameworkConstants.Messages.FiltersNotAccepted`):
@@ -25,6 +27,10 @@
   Any other value is rejected with `Invalid orderByFieldName: <name>`. `BaseService.pagedSearch` returns it
   as an error message and runs no query. Calling `BaseRepository.pagedSearch` directly throws an `Error`
   with the same message.
+
+- The keyword condition and the server filters are now each wrapped in brackets in `pagedSearch`. A keyword
+  condition that contains `OR`, combined with filters, no longer evaluates as `A OR B AND C`. Such a search
+  can return fewer rows in 0.2.0 than in 0.1.0; the rows now returned are the correct ones.
 
 ### Added
 

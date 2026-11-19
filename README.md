@@ -247,13 +247,19 @@ and a `NULL` row does not match the `= false` live check.
 | Method | Behaviour with `softDeleteColumn` set |
 |--------|---------------------------------------|
 | `read(id)` | Finds only live rows. |
-| `update(dto)` | Returns `null` if the row is missing or deleted. Reloads only live rows. |
+| `update(dto)` | Returns `null` if the row is missing or deleted. Writes only live rows and never changes the soft-delete column, even if the DTO carries it. Reloads only live rows. |
 | `delete(id)` | Finds the live row, sets the column to `true` without writing any other DTO field, and returns the DTO as it was before. TypeORM's automatic `@UpdateDateColumn` still updates. |
 | `pagedSearch(p)` | Adds `entity.<column> = false` to the query. `totalCount` excludes deleted rows, also with `pageSize: -1`. |
 | `hardDelete(id)` | Finds the row whether deleted or not, removes it, and returns its DTO as it was. |
 | `insert`, `bulkInsert` | Unchanged. The database default sets the column. |
 
 Without `softDeleteColumn`, every method behaves as in 0.1.0 and `hardDelete` is the same as `delete`.
+
+`update` never changes the soft-delete column: a DTO with `isDeleted: true` or `false` does not delete or
+restore the row. Use `delete` or `hardDelete` to remove it.
+
+Without `softDeleteColumn`, `delete` delegates to `hardDelete`. A subclass that overrides `hardDelete`
+therefore changes `delete` too, and its `hardDelete` must not call `super.delete` (that would loop forever).
 
 `BaseService` has a matching `hardDelete(request)`. It mirrors `delete` and returns the same messages
 (`Item not found for deletion` / `Data deleted successfully`).
@@ -356,7 +362,7 @@ peerDependencyRules:
     "@automapper/nestjs>@nestjs/core": "12"
 ```
 
-NestJS 12, `@automapper/nestjs` 9 and TypeORM 1.x are ESM only; NestJS 10/11 on CommonJS keeps working
+NestJS 12 and `@automapper/nestjs` 9 are ESM only (TypeORM 1.x ships both CJS and ESM); NestJS 10/11 on CommonJS keeps working
 (see [Supported versions](#supported-versions)).
 
 ### Using DateTransformInterceptor
