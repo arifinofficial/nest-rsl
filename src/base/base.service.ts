@@ -1,12 +1,13 @@
-import { BaseDto } from './base.dto'
+import { isEmpty } from 'class-validator'
 import { BaseRepository } from './base.repository'
 import { GenericRequest, PagedSearchRequest } from '../dto/request'
 import { GenericResponse, GenericPagedSearchResponse } from '../dto/response'
+import { FrameworkConstants } from '../constants/framework.constants'
 import { PagedSearchParameter } from '../models/paged-search-parameter.model'
 
 export abstract class BaseService<
   Entity extends { id: IdType },
-  Dto extends BaseDto<IdType>,
+  Dto extends { id: IdType },
   IdType = number,
   Repository extends BaseRepository<Entity, Dto, IdType> = BaseRepository<Entity, Dto, IdType>,
 > {
@@ -57,6 +58,18 @@ export abstract class BaseService<
     return response
   }
 
+  async hardDelete(request: GenericRequest<IdType>): Promise<GenericResponse<Dto>> {
+    const response = new GenericResponse<Dto>()
+    const dto = await this.repository.hardDelete(request.data)
+    if (!dto) {
+      response.addErrorMessage('Item not found for deletion')
+      return response
+    }
+    response.data = dto
+    response.addInfoMessage('Data deleted successfully')
+    return response
+  }
+
   async pagedSearch(request: PagedSearchRequest): Promise<GenericPagedSearchResponse<Dto>> {
     return await this.pagedSearchInternal(this.repository, request)
   }
@@ -86,7 +99,17 @@ export abstract class BaseService<
     request: PagedSearchRequest,
   ): Promise<GenericPagedSearchResponse<Dto>> {
     const response = new GenericPagedSearchResponse<Dto>()
+    // A 0.1.0 client may still send filters; fail loudly instead of widening the result.
+    if (!isEmpty(request.filters) || !isEmpty(request.filtersVariable)) {
+      response.addErrorMessage(FrameworkConstants.Messages.FiltersNotAccepted)
+      return response
+    }
     const pagedSearchParameter = this.getPagedSearchParameter(request)
+    const orderByFieldName = pagedSearchParameter.orderByFieldName
+    if (orderByFieldName && !repository.isSortableField(orderByFieldName)) {
+      response.addErrorMessage('Invalid orderByFieldName: ' + orderByFieldName)
+      return response
+    }
     const result = await repository.pagedSearch(pagedSearchParameter)
     response.dtoCollection = result.result
     response.totalCount = result.count

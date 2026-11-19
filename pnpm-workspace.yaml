@@ -1,0 +1,7 @@
+peerDependencyRules:
+  allowedVersions:
+    "@automapper/nestjs>@nestjs/common": "12"
+    "@automapper/nestjs>@nestjs/core": "12"
+
+allowBuilds:
+  esbuild: true

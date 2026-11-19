@@ -3,3 +3,5 @@ node_modules/
 *.tsbuildinfo
 coverage/
 docs/
+compat/nest-rsl.tgz
+compat/pnpm-lock.yaml
