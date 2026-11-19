@@ -16,6 +16,12 @@ function checkRelease(cwd: string, tag: string) {
   return { status: result.status, output: `${result.stdout}${result.stderr}` }
 }
 
+function setVersion(repo: string, version: string) {
+  writeFileSync(join(repo, 'package.json'), JSON.stringify({ name: 'x', version }))
+  git(repo, 'commit', '-q', '-am', `version ${version}`)
+  git(repo, 'push', '-q', 'origin', 'main')
+}
+
 describe('scripts/check-release.sh', () => {
   let root: string
   let repo: string
@@ -51,13 +57,16 @@ describe('scripts/check-release.sh', () => {
     expect(result.output).toContain('does not match')
   })
 
-  it('fails for a pre-release tag v0.3.0-beta.1', () => {
-    expect(checkRelease(repo, 'v0.3.0-beta.1').status).not.toBe(0)
-  })
-
-  it('fails for malformed tags v0.2.0x and release-0.2.0', () => {
-    expect(checkRelease(repo, 'v0.2.0x').status).not.toBe(0)
-    expect(checkRelease(repo, 'release-0.2.0').status).not.toBe(0)
+  // package.json carries the tag's own version, so only the stable-tag guard can reject these.
+  it.each([
+    ['v0.3.0-beta.1', '0.3.0-beta.1'],
+    ['v0.2.0x', '0.2.0x'],
+    ['release-0.2.0', '0.2.0'],
+  ])('fails for the non-stable tag %s even when package.json says %s', (tag, version) => {
+    setVersion(repo, version)
+    const result = checkRelease(repo, tag)
+    expect(result.status).not.toBe(0)
+    expect(result.output).toContain('not a stable')
   })
 
   it('fails when HEAD is not on origin/main', () => {
