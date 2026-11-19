@@ -4,6 +4,7 @@
   "description": "Generic Repository + Service Layer base classes for NestJS",
   "author": "",
   "license": "MIT",
+  "packageManager": "pnpm@12.21.0",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
